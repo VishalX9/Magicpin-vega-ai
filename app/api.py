@@ -11,6 +11,7 @@ Vera bot — HTTP server for the magicpin judge harness (challenge-testing-brief
 Run:  uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}
 State is in-memory -> run exactly ONE worker process.
 """
+from fastapi.responses import HTMLResponse
 import logging
 import os
 import threading
@@ -273,3 +274,193 @@ def teardown():
     with STORE.lock:
         STORE.reset()
     return {"status": "wiped"}
+    @app.get("/chat", response_class=HTMLResponse)
+def chat():
+    return """
+    
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vera AI</title>
+<style>
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f4f5f7;
+}
+.container {
+    max-width: 700px;
+    margin: auto;
+    height: 100vh;
+    background: white;
+    display: flex;
+    flex-direction: column;
+}
+.header {
+    padding: 18px;
+    border-bottom: 1px solid #ddd;
+}
+.header h2 { margin: 0; }
+.header p {
+    margin: 5px 0 0;
+    color: #777;
+}
+#chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+}
+.msg {
+    max-width: 75%;
+    padding: 12px 15px;
+    margin: 10px 0;
+    border-radius: 16px;
+    white-space: pre-wrap;
+}
+.user {
+    margin-left: auto;
+    background: #111;
+    color: white;
+}
+.bot {
+    background: #eee;
+}
+.input {
+    display: flex;
+    padding: 15px;
+    border-top: 1px solid #ddd;
+    gap: 10px;
+}
+input {
+    flex: 1;
+    padding: 13px;
+    border: 1px solid #ccc;
+    border-radius: 25px;
+    font-size: 15px;
+}
+button {
+    border: 0;
+    background: #111;
+    color: white;
+    padding: 0 20px;
+    border-radius: 25px;
+    cursor: pointer;
+}
+#loading {
+    display: none;
+    color: #777;
+    padding: 0 20px 10px;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<div class="header">
+<h2>Vera — AI Merchant Assistant</h2>
+<p>Chat with your AI assistant</p>
+</div>
+
+<div id="chat">
+<div class="msg bot">
+Hi! I'm Vera. How can I help you today?
+</div>
+</div>
+
+<div id="loading">Vera is thinking...</div>
+
+<div class="input">
+<input id="message" placeholder="Type your message..." />
+<button onclick="sendMessage()">Send</button>
+</div>
+
+</div>
+
+<script>
+const conversationId =
+    "web_" + Date.now() + "_" + Math.random().toString(36).substring(2);
+
+let turnNumber = 1;
+
+function addMessage(text, type) {
+    const div = document.createElement("div");
+    div.className = "msg " + type;
+    div.textContent = text;
+
+    document.getElementById("chat").appendChild(div);
+
+    const chat = document.getElementById("chat");
+    chat.scrollTop = chat.scrollHeight;
+}
+
+async function sendMessage() {
+
+    const input = document.getElementById("message");
+    const message = input.value.trim();
+
+    if (!message) return;
+
+    addMessage(message, "user");
+    input.value = "";
+
+    document.getElementById("loading").style.display = "block";
+
+    try {
+
+        const response = await fetch("/v1/reply", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                conversation_id: conversationId,
+                merchant_id: "m_001_drmeera_dentist_delhi",
+                customer_id: null,
+                from_role: "merchant",
+                message: message,
+                received_at: new Date().toISOString(),
+                turn_number: turnNumber++
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || "Request failed");
+        }
+
+        let answer =
+            data.body ||
+            data.message ||
+            data.rationale ||
+            JSON.stringify(data);
+
+        addMessage(answer, "bot");
+
+    } catch (error) {
+
+        console.error(error);
+
+        addMessage(
+            "Sorry, I couldn't process that request. Please try again.",
+            "bot"
+        );
+
+    } finally {
+        document.getElementById("loading").style.display = "none";
+        input.focus();
+    }
+}
+
+document.getElementById("message").addEventListener("keydown", function(e) {
+    if (e.key === "Enter") {
+        sendMessage();
+    }
+});
+</script>
+
+</body>
+</html>
+"""
