@@ -1,0 +1,4 @@
+# Python 3.9+ compatible (fastapi 0.128.x is the last line supporting 3.9)
+fastapi>=0.110,<0.129
+uvicorn[standard]>=0.29,<0.40
+pydantic>=2.5,<3
